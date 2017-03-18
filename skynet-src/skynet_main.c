@@ -59,7 +59,9 @@ _init_env(lua_State *L) {
 			exit(1);
 		}
 		const char * key = lua_tostring(L,-2);
-		if (lua_type(L,-1) == LUA_TBOOLEAN) {
+		if (key[0] == '_') {
+			//fprintf(stderr, "Config skip %s\n", key);
+		} else if (lua_type(L,-1) == LUA_TBOOLEAN) {
 			int b = lua_toboolean(L,-1);
 			skynet_setenv(key,b ? "true" : "false" );
 		} else {
@@ -68,6 +70,7 @@ _init_env(lua_State *L) {
 				fprintf(stderr, "Invalid config table key = %s\n", key);
 				exit(1);
 			}
+			//fprintf(stderr, "Config %s=%s\n", key, value);
 			skynet_setenv(key,value);
 		}
 		lua_pop(L,1);
@@ -108,7 +111,7 @@ static const char * load_config = "\
 		assert(load(code,[[@]]..filename,[[t]],result))()\n\
 		current_path = last_path\n\
 	end\n\
-	setmetatable(result, { __index = { include = include } })\n\
+	setmetatable(result, { __index = { include = include,pairs=pairs,ipairs=ipairs } })\n\
 	local config_name = ...\n\
 	include(config_name)\n\
 	setmetatable(result, nil)\n\
