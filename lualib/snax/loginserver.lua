@@ -47,7 +47,7 @@ local function write(service, fd, text)
 	assert_socket(service, socket.write(fd, text), fd)
 end
 
-local function launch_slave(auth_handler)
+local function launch_slave(auth_handler, init_slave)
 	local function auth(fd, addr)
 		-- set socket buffer limit (8K)
 		-- If the attacker send large package, close the socket
@@ -101,6 +101,10 @@ local function launch_slave(auth_handler)
 		local msg, len = ret_pack(pcall(auth, fd, addr))
 		socket.abandon(fd)	-- never raise error here
 		return msg, len
+	end
+
+	if init_slave then
+		init_slave()
 	end
 
 	skynet.dispatch("lua", function(_,_,...)
@@ -161,6 +165,10 @@ local function launch_master(conf)
 		skynet.ret(skynet.pack(conf.command_handler(command, ...)))
 	end)
 
+	if conf.init_master then
+		conf.init_master()
+	end
+
 	for i=1,instance do
 		table.insert(slave, skynet.newservice(SERVICE_NAME))
 	end
@@ -189,12 +197,14 @@ local function login(conf)
 		local loginmaster = skynet.localname(name)
 		if loginmaster then
 			local auth_handler = assert(conf.auth_handler)
+			local init_slave = conf.init_slave
 			launch_master = nil
 			conf = nil
-			launch_slave(auth_handler)
+			launch_slave(auth_handler, init_slave)
 		else
 			launch_slave = nil
 			conf.auth_handler = nil
+			conf.init_slave = nil
 			assert(conf.login_handler)
 			assert(conf.command_handler)
 			skynet.register(name)
