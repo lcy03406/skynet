@@ -5,7 +5,7 @@ local sproto = require "sproto"
 local loader = {}
 
 function loader.register(filename, index)
-	local f = assert(io.open(filename), "Can't open sproto file")
+	local f = assert(io.open(filename), "Can't open sproto file: ".. filename)
 	local data = f:read "a"
 	f:close()
 	local sp = core.newproto(parser.parse(data))
