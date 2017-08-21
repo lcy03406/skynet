@@ -181,6 +181,9 @@ local header_tmp = {}
 
 local function gen_response(self, response, session)
 	return function(args, ud)
+		if args == "session" then
+			return session
+		end
 		header_tmp.type = nil
 		header_tmp.session = session
 		header_tmp.ud = ud

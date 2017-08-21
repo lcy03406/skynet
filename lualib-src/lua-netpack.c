@@ -42,10 +42,11 @@ struct uncomplete {
 
 struct queue {
 	int cap;
+	int hashsize;
 	int head;
 	int tail;
-	struct uncomplete * hash[HASHSIZE];
-	struct netpack queue[QUEUESIZE];
+	struct uncomplete** hash;
+	struct netpack queue[0];
 };
 
 static void
@@ -69,6 +70,8 @@ lclear(lua_State *L) {
 		clear_list(q->hash[i]);
 		q->hash[i] = NULL;
 	}
+	skynet_free(q->hash);
+	q->hash = NULL;
 	if (q->head > q->tail) {
 		q->tail += q->cap;
 	}
@@ -82,18 +85,18 @@ lclear(lua_State *L) {
 }
 
 static inline int
-hash_fd(int fd) {
+hash_fd(int fd, int hashsize) {
 	int a = fd >> 24;
 	int b = fd >> 12;
 	int c = fd;
-	return (int)(((uint32_t)(a + b + c)) % HASHSIZE);
+	return (int)(((uint32_t)(a + b + c)) % hashsize);
 }
 
 static struct uncomplete *
 find_uncomplete(struct queue *q, int fd) {
 	if (q == NULL)
 		return NULL;
-	int h = hash_fd(fd);
+	int h = hash_fd(fd, q->hashsize);
 	struct uncomplete * uc = q->hash[h];
 	if (uc == NULL)
 		return NULL;
@@ -114,17 +117,26 @@ find_uncomplete(struct queue *q, int fd) {
 }
 
 static struct queue *
+new_queue(lua_State *L, int hashsize, int qsize) {
+	size_t sz = sizeof(struct queue) + qsize * sizeof(struct netpack) + hashsize * sizeof(struct uncomplete *);
+	struct queue *q = lua_newuserdata(L, sz);
+	q->cap = qsize;
+	q->hashsize = hashsize;
+	q->hash = (struct uncomplete**)((char*)q + sizeof(struct queue) + qsize * sizeof(struct netpack));
+	q->head = 0;
+	q->tail = 0;
+	int i;
+	for (i=0;i<HASHSIZE;i++) {
+		q->hash[i] = NULL;
+	}
+	return q;
+}
+
+static struct queue *
 get_queue(lua_State *L) {
 	struct queue *q = lua_touserdata(L,1);
 	if (q == NULL) {
-		q = lua_newuserdata(L, sizeof(struct queue));
-		q->cap = QUEUESIZE;
-		q->head = 0;
-		q->tail = 0;
-		int i;
-		for (i=0;i<HASHSIZE;i++) {
-			q->hash[i] = NULL;
-		}
+		q = new_queue(L, HASHSIZE, QUEUESIZE);
 		lua_replace(L, 1);
 	}
 	return q;
@@ -132,12 +144,11 @@ get_queue(lua_State *L) {
 
 static void
 expand_queue(lua_State *L, struct queue *q) {
-	struct queue *nq = lua_newuserdata(L, sizeof(struct queue) + q->cap * sizeof(struct netpack));
-	nq->cap = q->cap + QUEUESIZE;
-	nq->head = 0;
+	int newcap = q->cap + (q->cap > QUEUESIZE ? QUEUESIZE : q->cap);
+	struct queue *nq = new_queue(L, q->hashsize, newcap);
 	nq->tail = q->cap;
-	memcpy(nq->hash, q->hash, sizeof(nq->hash));
-	memset(q->hash, 0, sizeof(q->hash));
+	memcpy(nq->hash, q->hash, q->hashsize * sizeof(struct uncomplete *));
+	memset(q->hash, 0, q->hashsize * sizeof(struct uncomplete *));
 	int i;
 	for (i=0;i<q->cap;i++) {
 		int idx = (q->head + i) % q->cap;
@@ -169,7 +180,7 @@ push_data(lua_State *L, int fd, void *buffer, int size, int clone) {
 static struct uncomplete *
 save_uncomplete(lua_State *L, int fd) {
 	struct queue *q = get_queue(L);
-	int h = hash_fd(fd);
+	int h = hash_fd(fd, q->hashsize);
 	struct uncomplete * uc = skynet_malloc(sizeof(struct uncomplete));
 	memset(uc, 0, sizeof(*uc));
 	uc->next = q->hash[h];
@@ -245,7 +256,7 @@ filter_data_(lua_State *L, int fd, uint8_t * buffer, int size) {
 		if (size < need) {
 			memcpy(uc->pack.buffer + uc->read, buffer, size);
 			uc->read += size;
-			int h = hash_fd(fd);
+			int h = hash_fd(fd, q->hashsize);
 			uc->next = q->hash[h];
 			q->hash[h] = uc;
 			return 1;
@@ -464,6 +475,16 @@ ltostring(lua_State *L) {
 	return 1;
 }
 
+static int
+lnewqueue(lua_State *L) {
+	int fdsize = luaL_checkinteger(L, 1);
+	int qsize = luaL_checkinteger(L, 2);
+	struct queue * q = new_queue(L, fdsize, qsize);
+	(void)q;
+	return 1;
+
+}
+
 LUAMOD_API int
 luaopen_skynet_netpack(lua_State *L) {
 	luaL_checkversion(L);
@@ -472,6 +493,7 @@ luaopen_skynet_netpack(lua_State *L) {
 		{ "pack", lpack },
 		{ "clear", lclear },
 		{ "tostring", ltostring },
+		{ "newqueue", lnewqueue },
 		{ NULL, NULL },
 	};
 	luaL_newlib(L,l);
