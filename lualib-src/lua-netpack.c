@@ -66,7 +66,7 @@ lclear(lua_State *L) {
 		return 0;
 	}
 	int i;
-	for (i=0;i<HASHSIZE;i++) {
+	for (i=0;i<q->hashsize;i++) {
 		clear_list(q->hash[i]);
 		q->hash[i] = NULL;
 	}
