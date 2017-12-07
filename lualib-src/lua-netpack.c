@@ -70,8 +70,6 @@ lclear(lua_State *L) {
 		clear_list(q->hash[i]);
 		q->hash[i] = NULL;
 	}
-	skynet_free(q->hash);
-	q->hash = NULL;
 	if (q->head > q->tail) {
 		q->tail += q->cap;
 	}
@@ -126,7 +124,7 @@ new_queue(lua_State *L, int hashsize, int qsize) {
 	q->head = 0;
 	q->tail = 0;
 	int i;
-	for (i=0;i<HASHSIZE;i++) {
+	for (i=0;i<hashsize;i++) {
 		q->hash[i] = NULL;
 	}
 	return q;
