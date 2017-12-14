@@ -1,3 +1,3 @@
 [submodule "3rd/jemalloc"]
 	path = 3rd/jemalloc
-	url = https://github.com/jemalloc/jemalloc.git
+	url = https://wsgit.jjmatch.cn/licy02/jj-server-gag-jemalloc.git
