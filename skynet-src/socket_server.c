@@ -1715,8 +1715,17 @@ do_bind(const char *host, int port, int protocol, int *family) {
 	if (fd < 0) {
 		goto _failed_fd;
 	}
-	if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (void *)&reuse, sizeof(int))==-1) {
-		goto _failed;
+	if (protocol == IPPROTO_TCP) {
+		if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (void *)&reuse, sizeof(int))==-1) {
+			goto _failed;
+		}
+	} else {
+#if __linux__
+		int pmtu = IP_PMTUDISC_WANT;
+		if (setsockopt(fd, SOL_IP, IP_MTU_DISCOVER, (void *)&pmtu, sizeof(int))==-1) {
+			goto _failed;
+		}
+#endif
 	}
 	status = bind(fd, (struct sockaddr *)ai_list->ai_addr, ai_list->ai_addrlen);
 	if (status != 0)

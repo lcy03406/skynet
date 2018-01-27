@@ -22,6 +22,7 @@
 #define TYPE_OPEN 4
 #define TYPE_CLOSE 5
 #define TYPE_WARNING 6
+#define TYPE_UDP 7
 
 /*
 	Each package is uint16 + data , uint16 (serialized in big-endian) is the number of bytes comprising the data .
@@ -389,6 +390,16 @@ lfilter(lua_State *L) {
 		lua_pushinteger(L, message->id);
 		lua_pushinteger(L, message->ud);
 		return 4;
+	case SKYNET_SOCKET_TYPE_UDP:
+		{
+			lua_pushvalue(L, lua_upvalueindex(TYPE_UDP));
+			lua_pushinteger(L, message->id);
+			pushstring(L, buffer, message->ud);
+			int addrsz = 0;
+			const char * addrstring = skynet_socket_udp_address(message, &addrsz);
+			pushstring(L, addrstring, addrsz);
+			return 5;
+		}
 	default:
 		// never get here
 		return 1;
@@ -503,8 +514,9 @@ luaopen_skynet_netpack(lua_State *L) {
 	lua_pushliteral(L, "open");
 	lua_pushliteral(L, "close");
 	lua_pushliteral(L, "warning");
+	lua_pushliteral(L, "udp");
 
-	lua_pushcclosure(L, lfilter, 6);
+	lua_pushcclosure(L, lfilter, 7);
 	lua_setfield(L, -2, "filter");
 
 	return 1;
