@@ -432,6 +432,22 @@ bson_numstr( char *str, unsigned int i ) {
 	}
 }
 
+//utf-8 encoding of Yi syllable Jji. it looks like '#'
+#define NUMKEYMAGIC "\xEA\x90\x9A"
+static const char numkeymagic[3] = NUMKEYMAGIC;
+static inline int 
+bson_numkey( char *str, lua_Integer i ) {
+	return sprintf(str, NUMKEYMAGIC "%lld", i);
+}
+static inline bool
+bson_keyisnum( const char *str ) {
+	return 0 == strncmp(str, numkeymagic, sizeof(numkeymagic));
+}
+static inline lua_Integer 
+bson_keynum( const char *str ) {
+	return strtoll(str + sizeof(numkeymagic), NULL, 10);
+}
+
 static void
 pack_array(lua_State *L, struct bson *b, int depth, size_t len) {
 	int length = reserve_length(b);
@@ -454,7 +470,18 @@ pack_dict_data(lua_State *L, struct bson *b, int depth, int kt) {
 	size_t sz;
 	switch(kt) {
 	case LUA_TNUMBER:
-		luaL_error(L, "Bson dictionary's key can't be number");
+		{
+			char numkey[32];
+			int isint;
+			lua_Integer intkey = lua_tointegerx(L,-2,&isint);
+			if (!isint) {
+				luaL_error(L, "Bson dictionary's key can't be number");
+			}
+			sz = bson_numkey(numkey, intkey);
+			key = numkey;
+			append_one(b, L, key, sz, depth);
+			lua_pop(L,1);
+		}
 		break;
 	case LUA_TSTRING:
 		key = lua_tolstring(L,-2,&sz);
@@ -612,7 +639,12 @@ unpack_dict(lua_State *L, struct bson_reader *br, bool array) {
 			int id = strtol(key, NULL, 10) + 1;
 			lua_pushinteger(L,id);
 		} else {
-			lua_pushlstring(L, key, klen);
+			if (bson_keyisnum(key)) {
+				lua_Integer intkey = bson_keynum(key);
+				lua_pushinteger(L, intkey);
+			} else {
+				lua_pushlstring(L, key, klen);
+			}
 		}
 		switch (bt) {
 		case BSON_REAL:
