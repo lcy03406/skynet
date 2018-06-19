@@ -9,6 +9,7 @@ end)
 
 local sharedata = {}
 local cache = setmetatable({}, { __mode = "kv" })
+local watch
 
 local function monitor(name, obj, cobj)
 	local newobj = cobj
@@ -18,9 +19,15 @@ local function monitor(name, obj, cobj)
 			break
 		end
 		sd.update(obj, newobj)
+		if watch then 
+			watch(name, newobj)
+		end
 	end
 	if cache[name] == obj then
 		cache[name] = nil
+	end
+	if watch then 
+		watch(name, newobj)
 	end
 end
 
@@ -66,5 +73,10 @@ function sharedata.deepcopy(name, ...)
 	skynet.send(service, "lua", "confirm" , cobj)
 	return ret
 end
+
+function sharedata.watch(w)
+	watch = w
+end
+
 
 return sharedata
