@@ -26,7 +26,7 @@ MYOBJS=
 
 # == END OF USER SETTINGS -- NO NEED TO CHANGE ANYTHING BELOW THIS LINE =======
 
-PLATS= aix bsd c89 freebsd generic linux macosx mingw posix solaris
+PLATS= aix bsd c89 freebsd generic linux macosx mingw posix solaris liblinux
 
 LUA_A=	liblua.a
 CORE_O=	lapi.o lcode.o lctype.o ldebug.o ldo.o ldump.o lfunc.o lgc.o llex.o \
@@ -108,6 +108,9 @@ generic: $(ALL)
 
 linux:
 	$(MAKE) $(ALL) SYSCFLAGS="-DLUA_USE_LINUX" SYSLIBS="-Wl,-E -ldl -lreadline"
+
+liblinux:
+	$(MAKE) $(ALL_A) CFLAGS="-O0 -g -ggdb -Wall -Wextra -fPIC -DLUA_USE_LINUX -I../../skynet-src" SYSLIBS="-Wl,-E -ldl -lreadline"
 
 macosx:
 	$(MAKE) $(ALL) SYSCFLAGS="-DLUA_USE_MACOSX" SYSLIBS="-lreadline" CC=cc
