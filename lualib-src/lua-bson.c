@@ -416,7 +416,9 @@ append_one(struct bson *bs, lua_State *L, const char *key, size_t sz, int depth)
 		write_byte(bs, lua_toboolean(L,-1));
 		break;
 	case LUA_TNIL:
-		luaL_error(L, "Bson array has a hole (nil), Use bson.null instead");
+		append_key(bs, L, BSON_NULL, key, sz);
+		break;
+		//luaL_error(L, "Bson array has a hole (nil), Use bson.null instead");
 	default:
 		luaL_error(L, "Invalid value type : %s", lua_typename(L,vt));
 	}
@@ -690,10 +692,13 @@ unpack_dict(lua_State *L, struct bson_reader *br, bool array) {
 			break;
 		}
 		case BSON_MINKEY:
-		case BSON_MAXKEY:
-		case BSON_NULL: {
+		case BSON_MAXKEY: {
 			char key[] = { 0, bt };
 			lua_pushlstring(L, key, sizeof(key));
+			break;
+		}
+		case BSON_NULL: {
+			lua_pushnil(L);
 			break;
 		}
 		case BSON_REGEX: {
