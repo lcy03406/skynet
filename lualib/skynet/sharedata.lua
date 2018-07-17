@@ -12,22 +12,24 @@ local cache = setmetatable({}, { __mode = "kv" })
 local watch
 
 local function monitor(name, obj, cobj)
-	local newobj = cobj
+	local newcobj = cobj
 	while true do
-		newobj = skynet.call(service, "lua", "monitor", name, newobj)
-		if newobj == nil then
+		newcobj = skynet.call(service, "lua", "monitor", name, newcobj)
+		if newcobj == nil then
 			break
 		end
-		sd.update(obj, newobj)
+		sd.update(obj, newcobj)
 		if watch then 
-			watch(name, newobj)
+			local r = sd.box(newcobj)
+			watch(name, r)
 		end
 	end
 	if cache[name] == obj then
 		cache[name] = nil
 	end
 	if watch then 
-		watch(name, newobj)
+		local r = sd.box(newcobj)
+		watch(name, r)
 	end
 end
 
