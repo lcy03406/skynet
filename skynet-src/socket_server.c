@@ -299,7 +299,13 @@ write_buffer_free(struct socket_server *ss, struct write_buffer *wb) {
 static void
 socket_keepalive(int fd) {
 	int keepalive = 1;
-	setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, (void *)&keepalive , sizeof(keepalive));  
+	int keepalive_time = 5;
+	int keepalive_count = 3;
+	int keepalive_interval = 1;
+	setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, (void *)&keepalive , sizeof(keepalive));
+	setsockopt(fd, IPPROTO_TCP, TCP_KEEPIDLE, (void*)&keepalive_time, sizeof(keepalive_time));
+	setsockopt(fd, IPPROTO_TCP, TCP_KEEPCNT, (void*)&keepalive_count, sizeof(keepalive_count));
+	setsockopt(fd, IPPROTO_TCP, TCP_KEEPINTVL, (void*)&keepalive_interval, sizeof(keepalive_interval));
 }
 
 static int
