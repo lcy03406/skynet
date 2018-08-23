@@ -11,6 +11,9 @@
 #include <limits.h>
 #include <stddef.h>
 
+#include <stdlib.h>
+
+#define lua_assert(x) ((void)((x) || (abort(), 0)))
 
 /*
 ** ===================================================================
