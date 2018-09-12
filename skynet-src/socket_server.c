@@ -299,8 +299,8 @@ write_buffer_free(struct socket_server *ss, struct write_buffer *wb) {
 static void
 socket_keepalive(int fd) {
 	int keepalive = 1;
-	int keepalive_time = 5;
-	int keepalive_count = 3;
+	int keepalive_time = 20;
+	int keepalive_count = 10;
 	int keepalive_interval = 1;
 	setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, (void *)&keepalive , sizeof(keepalive));
 	setsockopt(fd, IPPROTO_TCP, TCP_KEEPIDLE, (void*)&keepalive_time, sizeof(keepalive_time));
