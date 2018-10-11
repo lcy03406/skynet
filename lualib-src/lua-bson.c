@@ -291,6 +291,17 @@ is_32bit(int64_t v) {
 	return v >= INT32_MIN && v <= INT32_MAX;
 }
 
+static bool
+is_dict_pack_with_array(lua_State *L) {
+	lua_pushnil(L);
+	while(lua_next(L,-2) != 0) {
+		int kt = lua_type(L, -2);
+		lua_pop(L, 2);
+		return (kt == LUA_TNUMBER);
+	}
+	return false;
+}
+
 static void
 append_number(struct bson *bs, lua_State *L, const char *key, size_t sz) {
 	if (lua_isinteger(L, -1)) {
@@ -497,12 +508,56 @@ pack_dict_data(lua_State *L, struct bson *b, int depth, int kt) {
 }
 
 static void
-pack_simple_dict(lua_State *L, struct bson *b, int depth) {
+pack_dict_with_array_data(lua_State *L, struct bson *b, int depth, int i) {
+
+	int isint;
+	lua_Integer intkey = lua_tointegerx(L,-2,&isint);
+	if (!isint) {
+		luaL_error(L, "Bson dictionary's key can't be number");
+	}
+	//write __k
+	const char* __k = "__k";
+	if (is_32bit(intkey)) {
+		append_key(b, L, BSON_INT32, __k, strlen(__k));
+		write_int32(b, intkey);
+	} else {
+		append_key(b, L, BSON_INT64, __k, strlen(__k));
+		write_int64(b, intkey);
+	}
+	//write __v
+	const char* __v = "__v";
+	append_one(b, L, __v, strlen(__v), depth);
+
+	lua_pop(L,1);
+}
+
+static void
+pack_dict_with_array(lua_State *L, struct bson *b, int depth, int i)
+{
+	char numberkey[32];
+	size_t sz = bson_numstr(numberkey, i - 1);
+	const char * key = numberkey;
+	append_key(b, L, BSON_DOCUMENT, key, sz);
 	int length = reserve_length(b);
+	pack_dict_with_array_data(L, b, depth, i);
+	write_byte(b,0);
+	write_length(b, b->size - length, length);
+}
+
+static void
+pack_simple_dict(lua_State *L, struct bson *b, int depth, bool is_arr) {
+	int length = reserve_length(b);
+	int i = 1;
 	lua_pushnil(L);
 	while(lua_next(L,-2) != 0) {
-		int kt = lua_type(L, -2);
-		pack_dict_data(L, b, depth, kt);
+		if (is_arr) {
+			pack_dict_with_array(L, b, depth, i);
+		}
+		else {
+			int kt = lua_type(L, -2);
+			pack_dict_data(L, b, depth, kt);
+		}
+		i ++;
 	}
 	write_byte(b,0);
 	write_length(b, b->size - length, length);
@@ -568,8 +623,10 @@ append_table(struct bson *bs, lua_State *L, const char *key, size_t sz, int dept
 		append_key(bs, L, BSON_ARRAY, key, sz);
 		pack_array(L, bs, depth, lua_rawlen(L, -1));
 	} else {
-		append_key(bs, L, BSON_DOCUMENT, key, sz);
-		pack_simple_dict(L, bs, depth);
+		bool is_arr = is_dict_pack_with_array(L);
+		int type = is_arr ? BSON_ARRAY : BSON_DOCUMENT;
+		append_key(bs, L, type, key, sz);
+		pack_simple_dict(L, bs, depth, is_arr);
 	}
 }
 
@@ -619,7 +676,7 @@ make_object(lua_State *L, int type, const void * ptr, size_t len) {
 }
 
 static void
-unpack_dict(lua_State *L, struct bson_reader *br, bool array) {
+unpack_dict(lua_State *L, struct bson_reader *br, bool array, lua_Integer* outpkey) {
 	luaL_checkstack(L, 16, NULL);	// reserve enough stack space to unpack table
 	int sz = read_int32(L, br);
 	const void * bytes = read_bytes(L, br, sz-5);
@@ -628,6 +685,7 @@ unpack_dict(lua_State *L, struct bson_reader *br, bool array) {
 	if (end != '\0') {
 		luaL_error(L, "Invalid document end");
 	}
+	bool set_table = true;
 
 	lua_newtable(L);
 
@@ -663,11 +721,22 @@ unpack_dict(lua_State *L, struct bson_reader *br, bool array) {
 			lua_pushlstring(L, read_bytes(L, &t, sz), sz-1);
 			break;
 		}
-		case BSON_DOCUMENT:
-			unpack_dict(L, &t, false);
+		case BSON_DOCUMENT: {
+			lua_Integer k = 0;
+			unpack_dict(L, &t, false, &k);
+			if (k) {
+				lua_pushstring(L,"__v");
+				lua_rawget(L,-2);
+				lua_pushinteger(L, k);
+				lua_rotate(L, -2, 1);
+				lua_rawset(L, -5);
+				lua_pop(L, 2);
+				set_table = false;
+			}
 			break;
+		}
 		case BSON_ARRAY:
-			unpack_dict(L, &t, true);
+			unpack_dict(L, &t, true, NULL);
 			break;
 		case BSON_BINARY: {
 			int sz = read_int32(L, &t);
@@ -764,8 +833,18 @@ unpack_dict(lua_State *L, struct bson_reader *br, bool array) {
 			lua_pop(L,1);
 			continue;
 		}
-		lua_rawset(L,-3);
+		if(set_table) lua_rawset(L,-3);
 	}
+	if (array) return;
+
+	lua_pushstring(L,"__k");
+	lua_rawget(L,-2);
+	if(LUA_TNIL == lua_type(L,-1)) {
+		lua_pop(L, 1);
+		return;
+	}
+	*outpkey = lua_tointeger(L,-1);
+	lua_pop(L, 1);
 }
 
 static int
@@ -949,7 +1028,7 @@ ldecode(lua_State *L) {
 	int32_t len = get_length(b);
 	struct bson_reader br = { b , len };
 
-	unpack_dict(L, &br, false);
+	unpack_dict(L, &br, false, NULL);
 
 	return 1;
 }
@@ -981,7 +1060,7 @@ encode_bson(lua_State *L) {
 	if (luaL_getmetafield(L, -1, "__pairs") != LUA_TNIL) {
 		pack_meta_dict(L, b, 0);
 	} else {
-		pack_simple_dict(L, b, 0);
+		pack_simple_dict(L, b, 0, false);
 	}
 	void * ud = lua_newuserdata(L, b->size);
 	memcpy(ud, b->ptr, b->size);
