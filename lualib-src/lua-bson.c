@@ -685,11 +685,10 @@ unpack_dict(lua_State *L, struct bson_reader *br, bool array, lua_Integer* outpk
 	if (end != '\0') {
 		luaL_error(L, "Invalid document end");
 	}
-	bool set_table = true;
-
 	lua_newtable(L);
 
 	for (;;) {
+		bool set_table = true;
 		if (t.size == 0)
 			break;
 		int bt = read_byte(L, &t);
