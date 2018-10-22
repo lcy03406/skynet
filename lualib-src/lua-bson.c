@@ -676,7 +676,7 @@ make_object(lua_State *L, int type, const void * ptr, size_t len) {
 }
 
 static void
-unpack_dict(lua_State *L, struct bson_reader *br, bool array, lua_Integer* outpkey) {
+unpack_dict(lua_State *L, struct bson_reader *br, bool array, lua_Integer* outpkey, bool* hasoutkey) {
 	luaL_checkstack(L, 16, NULL);	// reserve enough stack space to unpack table
 	int sz = read_int32(L, br);
 	const void * bytes = read_bytes(L, br, sz-5);
@@ -722,8 +722,9 @@ unpack_dict(lua_State *L, struct bson_reader *br, bool array, lua_Integer* outpk
 		}
 		case BSON_DOCUMENT: {
 			lua_Integer k = 0;
-			unpack_dict(L, &t, false, &k);
-			if (k) {
+			bool has = false;
+			unpack_dict(L, &t, false, &k, &has);
+			if (has) {
 				lua_pushstring(L,"__v");
 				lua_rawget(L,-2);
 				lua_pushinteger(L, k);
@@ -735,7 +736,7 @@ unpack_dict(lua_State *L, struct bson_reader *br, bool array, lua_Integer* outpk
 			break;
 		}
 		case BSON_ARRAY:
-			unpack_dict(L, &t, true, NULL);
+			unpack_dict(L, &t, true, NULL, false);
 			break;
 		case BSON_BINARY: {
 			int sz = read_int32(L, &t);
@@ -843,6 +844,7 @@ unpack_dict(lua_State *L, struct bson_reader *br, bool array, lua_Integer* outpk
 		return;
 	}
 	*outpkey = lua_tointeger(L,-1);
+	*hasoutkey = true;
 	lua_pop(L, 1);
 }
 
@@ -1027,7 +1029,7 @@ ldecode(lua_State *L) {
 	int32_t len = get_length(b);
 	struct bson_reader br = { b , len };
 
-	unpack_dict(L, &br, false, NULL);
+	unpack_dict(L, &br, false, NULL, false);
 
 	return 1;
 }
