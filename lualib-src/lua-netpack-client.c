@@ -207,7 +207,7 @@ read_size(uint8_t * buffer) {
 
 static void
 push_more(lua_State *L, int fd, uint8_t *buffer, int size) {
-	if (size == 1) {
+	if (size < SIZE_BYTES) {
 		struct uncomplete * uc = save_uncomplete(L, fd);
 		uc->read = -1;
 		uc->header = *buffer;
@@ -288,7 +288,7 @@ filter_data_(lua_State *L, int fd, uint8_t * buffer, int size) {
 		lua_pushvalue(L, lua_upvalueindex(TYPE_MORE));
 		return 2;
 	} else {
-		if (size == 1) {
+		if (size < SIZE_BYTES) {
 			struct uncomplete * uc = save_uncomplete(L, fd);
 			uc->read = -1;
 			uc->header = *buffer;
