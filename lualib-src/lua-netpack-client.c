@@ -199,21 +199,31 @@ static inline int
 read_size(uint8_t * buffer) {
 #ifdef CLIENT_USE_4_SIZE_BYTES
 	int r = (int)buffer[0] << 24 |(int)buffer[1] << 16 | (int)buffer[2] << 8  | (int)buffer[3];
+	if (r <= 0 || r >= 0x500000) {
+		return -1;
+	}
 #else
 	int r = (int)buffer[0] << 8 | (int)buffer[1];
+	if (r <= 0 || r >= 0x10000) {
+		return -1;
+	}
 #endif
 	return r;
 }
 
-static void
+// 长度读入错误，返回错误
+static int
 push_more(lua_State *L, int fd, uint8_t *buffer, int size) {
 	if (size < SIZE_BYTES) {
 		struct uncomplete * uc = save_uncomplete(L, fd);
 		uc->read = -1;
 		uc->header = *buffer;
-		return;
+		return 0;
 	}
 	int pack_size = read_size(buffer);
+	if(pack_size == -1) {
+		return -1;
+	}
 	buffer += SIZE_BYTES;
 	size -= SIZE_BYTES;
 
@@ -223,15 +233,16 @@ push_more(lua_State *L, int fd, uint8_t *buffer, int size) {
 		uc->pack.size = pack_size;
 		uc->pack.buffer = skynet_malloc(pack_size);
 		memcpy(uc->pack.buffer, buffer, size);
-		return;
+		return 0;
 	}
 	push_data(L, fd, buffer, pack_size, 1);
 
 	buffer += pack_size;
 	size -= pack_size;
 	if (size > 0) {
-		push_more(L, fd, buffer, size);
+		return push_more(L, fd, buffer, size);
 	}
+	return 0;
 }
 
 static void
@@ -284,7 +295,12 @@ filter_data_(lua_State *L, int fd, uint8_t * buffer, int size) {
 		// more data
 		push_data(L, fd, uc->pack.buffer, uc->pack.size, 0);
 		skynet_free(uc);
-		push_more(L, fd, buffer, size);
+		if (push_more(L, fd, buffer, size) == -1) {
+			lua_pushvalue(L, lua_upvalueindex(TYPE_ERROR));
+			lua_pushinteger(L, fd);
+			lua_pushliteral(L, "read size failed");
+			return 4;
+		}
 		lua_pushvalue(L, lua_upvalueindex(TYPE_MORE));
 		return 2;
 	} else {
@@ -295,6 +311,14 @@ filter_data_(lua_State *L, int fd, uint8_t * buffer, int size) {
 			return 1;
 		}
 		int pack_size = read_size(buffer);
+		if(pack_size == - 1) {
+			close_uncomplete(L, fd);
+			lua_pushvalue(L, lua_upvalueindex(TYPE_ERROR));
+			lua_pushinteger(L, fd);
+			lua_pushliteral(L, "read size failed");
+			return 4;
+		}
+
 		buffer+=SIZE_BYTES;
 		size-=SIZE_BYTES;
 
@@ -320,7 +344,12 @@ filter_data_(lua_State *L, int fd, uint8_t * buffer, int size) {
 		push_data(L, fd, buffer, pack_size, 1);
 		buffer += pack_size;
 		size -= pack_size;
-		push_more(L, fd, buffer, size);
+		if (push_more(L, fd, buffer, size) == -1) {
+			lua_pushvalue(L, lua_upvalueindex(TYPE_ERROR));
+			lua_pushinteger(L, fd);
+			lua_pushliteral(L, "read size failed");
+			return 4;
+		}
 		lua_pushvalue(L, lua_upvalueindex(TYPE_MORE));
 		return 2;
 	}
@@ -475,7 +504,7 @@ lpack(lua_State *L) {
 	size_t len;
 	const char * ptr = tolstring(L, &len, 1);
 #ifdef CLIENT_USE_4_SIZE_BYTES
-	if (len >= 0x100000000) {
+	if (len >= 0x500000) {
 #else
 	if (len >= 0x10000) {
 #endif
