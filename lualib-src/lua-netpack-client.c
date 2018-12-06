@@ -199,12 +199,12 @@ static inline int
 read_size(uint8_t * buffer) {
 #ifdef CLIENT_USE_4_SIZE_BYTES
 	int r = (int)buffer[0] << 24 |(int)buffer[1] << 16 | (int)buffer[2] << 8  | (int)buffer[3];
-	if (r <= 0 || r >= 0x500000) {
+	if (r < 0 || r >= 0x500000) {
 		return -1;
 	}
 #else
 	int r = (int)buffer[0] << 8 | (int)buffer[1];
-	if (r <= 0 || r >= 0x10000) {
+	if (r < 0 || r >= 0x10000) {
 		return -1;
 	}
 #endif
