@@ -373,6 +373,43 @@ function skynet.call(addr, typename, ...)
 	return p.unpack(yield_call(addr, session))
 end
 
+--并行call调用
+--参数 {key = {addr, typename, param = {a, b, c}}}
+function skynet.mcall(multi)
+	if type(multi) ~= "table" or next(multi) == nil then return end
+	local tag = session_coroutine_tracetag[running_thread]
+	if tag then
+		c.trace(tag, "call", 2)
+		c.send(addr, skynet.PTYPE_TRACE, 0, tag)
+	end
+
+	local count = 0
+	local sessions = {}
+	for k,v in pairs(multi) do
+		local p = proto[v.typename]
+		local session = c.send(v.addr, p.id , nil , p.pack(table.unpack(v.param)))
+		if session == nil then
+			error("call to invalid address " .. skynet.address(v.addr))
+		end
+		watching_session[session] = v.addr
+		session_id_coroutine[session] = running_thread
+		sessions[session] = { key = k, p = p }
+		count = count + 1
+	end
+
+	local ret = {}
+	while count > 0 do
+		local succ, msg, sz, session = coroutine_yield "SUSPEND"
+		watching_session[session] = nil
+		if not succ then
+			error "call failed"
+		end
+		ret[sessions[session].key] = sessions[session].p.unpack(msg, sz)
+		count = count - 1
+	end
+	return ret
+end
+
 function skynet.rawcall(addr, typename, msg, sz)
 	local tag = session_coroutine_tracetag[running_thread]
 	if tag then
@@ -539,12 +576,12 @@ local function raw_dispatch_message(prototype, msg, sz, session, source)
 		if co == "BREAK" then
 			session_id_coroutine[session] = nil
 		elseif co == nil then
-			unknown_response(session, source, msg, sz)
+			unknown_response(session, source, msg, sz, session)
 		else
 			local tag = session_coroutine_tracetag[co]
 			if tag then c.trace(tag, "resume") end
 			session_id_coroutine[session] = nil
-			suspend(co, coroutine_resume(co, true, msg, sz))
+			suspend(co, coroutine_resume(co, true, msg, sz, session))
 		end
 	else
 		local p = proto[prototype]

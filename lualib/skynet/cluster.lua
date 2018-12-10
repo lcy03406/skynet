@@ -8,6 +8,19 @@ function cluster.call(node, address, ...)
 	return skynet.call(clusterd, "lua", "req", node, address, skynet.pack(...))
 end
 
+--并行call调用
+--参数 {key = {addr, typename, param = {a, b, c}}}
+function cluster.mcall(multi)
+	for k,v in pairs(multi) do
+		v.addr = clusterd
+		v.typename = "lua"
+		v.param = { "req", v.remote, v.to, skynet.pack(table.unpack(v.param)) }
+		v.remote = nil
+		v.to = nil
+	end
+	return skynet.mcall(multi)
+end
+
 function cluster.send(node, address, ...)
 	-- push is the same with req, but no response
 	skynet.send(clusterd, "lua", "push", node, address, skynet.pack(...))
