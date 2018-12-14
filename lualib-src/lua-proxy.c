@@ -29,7 +29,7 @@ fill_uint32(uint8_t * buf, uint32_t n) {
 
 static void
 fill_header(lua_State *L, uint8_t *buf, int sz) {
-	assert(sz < 0x500000);
+	assert(sz > 0 && sz < 0x500000);
 	buf[0] = (sz >> 24) & 0xff;
 	buf[1] = (sz >> 16) & 0xff;
 	buf[2] = (sz >> 8) & 0xff;
@@ -62,7 +62,7 @@ fill_header(lua_State *L, uint8_t *buf, int sz) {
 static int
 packreq_number(lua_State *L, const char* node, size_t nodelen, int session, void * msg, uint32_t sz, int is_push) {
 	uint32_t addr = (uint32_t)lua_tointeger(L,2);
-	uint8_t* buf = (uint8_t*)skynet_malloc(4+sz+10+nodelen);
+	uint8_t* buf = (uint8_t*)skynet_malloc(sz+14+nodelen);
 	int pos = 0;
 	fill_header(L, buf, sz+10+nodelen);
 	pos += 4;
@@ -77,8 +77,9 @@ packreq_number(lua_State *L, const char* node, size_t nodelen, int session, void
 	fill_uint32(buf+pos, is_push ? 0 : (uint32_t)session);
 	pos += 4;
 	memcpy(buf+pos,msg,sz);
+	pos += sz;
 
-	lua_pushlstring(L, (const char *)buf, pos+sz);
+	lua_pushlstring(L, (const char *)buf, pos);
 	skynet_free(buf);
 	return 0;
 }
@@ -91,7 +92,7 @@ packreq_string(lua_State *L, const char* node, size_t nodelen, int session, void
 		skynet_free(msg);
 		luaL_error(L, "name is too long %s", name);
 	}
-	uint8_t* buf = (uint8_t*)skynet_malloc(4+sz+7+nodelen+namelen);
+	uint8_t* buf = (uint8_t*)skynet_malloc(sz+11+nodelen+namelen);
 	int pos = 0;
 	fill_header(L, buf, sz+7+namelen+nodelen);
 	pos += 4;
@@ -108,8 +109,9 @@ packreq_string(lua_State *L, const char* node, size_t nodelen, int session, void
 	fill_uint32(buf+pos, is_push ? 0 : (uint32_t)session);
 	pos += 4;
 	memcpy(buf+pos,msg,sz);
+	pos += sz;
 
-	lua_pushlstring(L, (const char *)buf, pos+sz);
+	lua_pushlstring(L, (const char *)buf, pos);
 	skynet_free(buf);
 	return 0;
 }
@@ -381,6 +383,9 @@ lunpack(lua_State *L) {
 		size_t ssz;
 		msg = luaL_checklstring(L,1,&ssz);
 		sz = (int)ssz;
+	}
+	if(sz <= 0) {
+		return luaL_error(L, "Invalid package size %d", sz);
 	}
 	int cnt = 1;
 	lua_pushboolean(L, msg[0] == 3 ? 1 : 0);
