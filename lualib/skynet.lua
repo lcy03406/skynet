@@ -376,7 +376,13 @@ end
 --并行call调用
 --参数 {key = {addr, typename, param = {a, b, c}}}
 function skynet.mcall(multi)
-	if type(multi) ~= "table" or next(multi) == nil then return end
+	if type(multi) ~= "table" then
+		error("skynet.mcall, multi must be table.")
+		return
+	end
+	if next(multi) == nil then
+		return {}
+	end
 	local tag = session_coroutine_tracetag[running_thread]
 	if tag then
 		c.trace(tag, "call", 2)
