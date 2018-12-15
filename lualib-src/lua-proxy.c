@@ -325,8 +325,9 @@ lpackresponse(lua_State *L) {
 	buf[pos] = ok;
 	pos += 1;
 	memcpy(buf+pos,msg,sz);
+	pos += sz;
 
-	lua_pushlstring(L, (const char *)buf, sz+pos);
+	lua_pushlstring(L, (const char *)buf, pos);
 	skynet_free(buf);
 	return 1;
 }

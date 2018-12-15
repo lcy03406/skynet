@@ -44,7 +44,8 @@ struct uncomplete {
 	struct netpack pack;
 	struct uncomplete * next;
 	int read;
-	int header;
+	int header_read;
+	uint8_t header[SIZE_BYTES];
 };
 
 struct queue {
@@ -217,7 +218,8 @@ push_more(lua_State *L, int fd, uint8_t *buffer, int size) {
 	if (size < SIZE_BYTES) {
 		struct uncomplete * uc = save_uncomplete(L, fd);
 		uc->read = -1;
-		uc->header = *buffer;
+		memcpy(uc->header, buffer, size);
+		uc->header_read = size;
 		return 0;
 	}
 	int pack_size = read_size(buffer);
@@ -262,15 +264,34 @@ filter_data_(lua_State *L, int fd, uint8_t * buffer, int size) {
 	if (uc) {
 		// fill uncomplete
 		if (uc->read < 0) {
-			// read size
 			assert(uc->read == -1);
-			int pack_size = *buffer;
-			pack_size |= uc->header << 8 ;
-			++buffer;
-			--size;
+			if(uc->header_read+size<SIZE_BYTES)
+			{
+				struct uncomplete * uc = save_uncomplete(L, fd);
+				memcpy(uc->header+uc->header_read, buffer, size);
+				uc->header_read += size;
+				return 1;
+			}
+			// read size
+			int need_bytes = SIZE_BYTES-uc->header_read;
+			memcpy(uc->header+uc->header_read, buffer, need_bytes);
+
+			int pack_size = read_size(uc->header);
+			if(pack_size == -1) {
+				close_uncomplete(L, fd);
+				lua_pushvalue(L, lua_upvalueindex(TYPE_ERROR));
+				lua_pushinteger(L, fd);
+				lua_pushliteral(L, "read size");
+				return 4;
+			}
+
+			buffer += need_bytes;
+			size -= need_bytes;
+
 			uc->pack.size = pack_size;
 			uc->pack.buffer = skynet_malloc(pack_size);
 			uc->read = 0;
+			uc->header_read = 0;
 		}
 		int need = uc->pack.size - uc->read;
 		if (size < need) {
@@ -296,9 +317,10 @@ filter_data_(lua_State *L, int fd, uint8_t * buffer, int size) {
 		push_data(L, fd, uc->pack.buffer, uc->pack.size, 0);
 		skynet_free(uc);
 		if (push_more(L, fd, buffer, size) == -1) {
+			close_uncomplete(L, fd);
 			lua_pushvalue(L, lua_upvalueindex(TYPE_ERROR));
 			lua_pushinteger(L, fd);
-			lua_pushliteral(L, "read size failed");
+			lua_pushliteral(L, "read size");
 			return 4;
 		}
 		lua_pushvalue(L, lua_upvalueindex(TYPE_MORE));
@@ -307,7 +329,8 @@ filter_data_(lua_State *L, int fd, uint8_t * buffer, int size) {
 		if (size < SIZE_BYTES) {
 			struct uncomplete * uc = save_uncomplete(L, fd);
 			uc->read = -1;
-			uc->header = *buffer;
+			memcpy(uc->header, buffer, size);
+			uc->header_read = size;
 			return 1;
 		}
 		int pack_size = read_size(buffer);
@@ -315,7 +338,7 @@ filter_data_(lua_State *L, int fd, uint8_t * buffer, int size) {
 			close_uncomplete(L, fd);
 			lua_pushvalue(L, lua_upvalueindex(TYPE_ERROR));
 			lua_pushinteger(L, fd);
-			lua_pushliteral(L, "read size failed");
+			lua_pushliteral(L, "read size");
 			return 4;
 		}
 
@@ -345,9 +368,10 @@ filter_data_(lua_State *L, int fd, uint8_t * buffer, int size) {
 		buffer += pack_size;
 		size -= pack_size;
 		if (push_more(L, fd, buffer, size) == -1) {
+			close_uncomplete(L, fd);
 			lua_pushvalue(L, lua_upvalueindex(TYPE_ERROR));
 			lua_pushinteger(L, fd);
-			lua_pushliteral(L, "read size failed");
+			lua_pushliteral(L, "read size");
 			return 4;
 		}
 		lua_pushvalue(L, lua_upvalueindex(TYPE_MORE));
