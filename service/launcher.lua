@@ -22,6 +22,14 @@ function command.LIST()
 	return list
 end
 
+function command.COUNT()
+	local cnt = 0
+	for k, v in pairs(services) do
+		cnt = cnt + 1
+	end
+	return cnt
+end
+
 function command.STAT()
 	local list = {}
 	for k,v in pairs(services) do
