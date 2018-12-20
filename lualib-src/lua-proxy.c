@@ -8,6 +8,18 @@
 
 #include "skynet.h"
 
+#define tmp_length 51200
+
+//对于超过50k大的包在堆上分配
+#define temp_buffer(size)			\
+	int tmpsize = (size);			\
+	uint8_t	tmp[tmp_length];	\
+	uint8_t	*buf = tmp;			\
+	if(tmpsize > tmp_length) { buf = (uint8_t*)skynet_malloc(tmpsize); }
+
+#define temp_buffer_free() \
+	if(tmpsize > tmp_length) { skynet_free(buf); }
+
 /*
 	uint32_t/string addr
 	uint32_t/session session
@@ -62,7 +74,7 @@ fill_header(lua_State *L, uint8_t *buf, int sz) {
 static int
 packreq_number(lua_State *L, const char* node, size_t nodelen, int session, void * msg, uint32_t sz, int is_push) {
 	uint32_t addr = (uint32_t)lua_tointeger(L,2);
-	uint8_t* buf = (uint8_t*)skynet_malloc(sz+14+nodelen);
+	temp_buffer(sz+14+nodelen);
 	int pos = 0;
 	fill_header(L, buf, sz+10+nodelen);
 	pos += 4;
@@ -80,7 +92,7 @@ packreq_number(lua_State *L, const char* node, size_t nodelen, int session, void
 	pos += sz;
 
 	lua_pushlstring(L, (const char *)buf, pos);
-	skynet_free(buf);
+	temp_buffer_free();
 	return 0;
 }
 
@@ -92,7 +104,7 @@ packreq_string(lua_State *L, const char* node, size_t nodelen, int session, void
 		skynet_free(msg);
 		luaL_error(L, "name is too long %s", name);
 	}
-	uint8_t* buf = (uint8_t*)skynet_malloc(sz+11+nodelen+namelen);
+	temp_buffer(sz+11+nodelen+namelen);
 	int pos = 0;
 	fill_header(L, buf, sz+7+namelen+nodelen);
 	pos += 4;
@@ -112,7 +124,7 @@ packreq_string(lua_State *L, const char* node, size_t nodelen, int session, void
 	pos += sz;
 
 	lua_pushlstring(L, (const char *)buf, pos);
-	skynet_free(buf);
+	temp_buffer_free();
 	return 0;
 }
 
@@ -314,7 +326,7 @@ lpackresponse(lua_State *L) {
 		sz = (size_t)luaL_checkinteger(L, 4);
 	}
 
-	uint8_t* buf = (uint8_t*)skynet_malloc(sz+10);
+	temp_buffer(sz+10);
 	int pos = 0;
 	fill_header(L, buf, sz+6);
 	pos += 4;
@@ -328,7 +340,7 @@ lpackresponse(lua_State *L) {
 	pos += sz;
 
 	lua_pushlstring(L, (const char *)buf, pos);
-	skynet_free(buf);
+	temp_buffer_free();
 	return 1;
 }
 
