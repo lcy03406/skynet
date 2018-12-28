@@ -414,9 +414,6 @@ lunpack(lua_State *L) {
 		default:
 			return luaL_error(L, "Invalid req package type %d", msg[0]);
 	}
-	if (LUA_TLIGHTUSERDATA == msg_type) {
-		skynet_free((void*)msg);
-	}
 	return cnt;
 }
 
@@ -428,6 +425,7 @@ luaopen_skynet_proxy_core(lua_State *L) {
 		{ "packpush", lpackpush },
 		{ "packresponse", lpackresponse },
 		{ "unpack", lunpack },
+		{ "unpackrequest", lunpackrequest },
 		{ NULL, NULL },
 	};
 	luaL_checkversion(L);
