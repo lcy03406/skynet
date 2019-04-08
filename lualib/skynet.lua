@@ -252,6 +252,7 @@ function skynet.localname(name)
 	return c.addresscommand("QUERY", name)
 end
 
+skynet.addtime = c.addtime
 skynet.now = c.now
 skynet.hpc = c.hpc	-- high performance counter
 

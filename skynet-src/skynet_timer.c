@@ -54,6 +54,7 @@ struct timer {
 };
 
 static struct timer * TI = NULL;
+static uint32_t debug_diff_time = 0;
 
 static inline struct timer_node *
 link_clear(struct link_list *list) {
@@ -236,12 +237,12 @@ systime(uint32_t *sec, uint32_t *cs) {
 #if !defined(__APPLE__) || defined(AVAILABLE_MAC_OS_X_VERSION_10_12_AND_LATER)
 	struct timespec ti;
 	clock_gettime(CLOCK_REALTIME, &ti);
-	*sec = (uint32_t)ti.tv_sec;
+	*sec = (uint32_t)ti.tv_sec + debug_diff_time;
 	*cs = (uint32_t)(ti.tv_nsec / 10000000);
 #else
 	struct timeval tv;
 	gettimeofday(&tv, NULL);
-	*sec = tv.tv_sec;
+	*sec = tv.tv_sec + debug_diff_time;
 	*cs = tv.tv_usec / 10000;
 #endif
 }
@@ -260,7 +261,7 @@ gettime() {
 	t = (uint64_t)tv.tv_sec * 100;
 	t += tv.tv_usec / 10000;
 #endif
-	return t;
+	return t + debug_diff_time;
 }
 
 void
@@ -288,6 +289,11 @@ skynet_starttime(void) {
 uint64_t 
 skynet_now(void) {
 	return TI->current;
+}
+
+void
+skynet_addtime(uint32_t add) {
+	debug_diff_time = add;
 }
 
 void 

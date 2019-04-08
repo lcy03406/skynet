@@ -407,6 +407,13 @@ lnow(lua_State *L) {
 }
 
 static int
+laddtime(lua_State *L) {
+	uint32_t add = (uint32_t)luaL_checkinteger(L,1);
+	skynet_addtime(add);
+	return 0;
+}
+
+static int
 lhpc(lua_State *L) {
 	lua_pushinteger(L, get_time());
 	return 1;
@@ -506,6 +513,7 @@ luaopen_skynet_core(lua_State *L) {
 		{ "trash" , ltrash },
 		{ "now", lnow },
 		{ "hpc", lhpc },	// getHPCounter
+		{ "addtime", laddtime },
 		{ NULL, NULL },
 	};
 
