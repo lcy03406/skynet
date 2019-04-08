@@ -135,7 +135,7 @@ static time_t l_checktime (lua_State *L, int arg) {
 #endif				/* } */
 /* }================================================================== */
 
-
+time_t debug_diff_time = 0;
 
 
 static int os_execute (lua_State *L) {
@@ -283,7 +283,7 @@ static const char *checkoption (lua_State *L, const char *conv,
 static int os_date (lua_State *L) {
   size_t slen;
   const char *s = luaL_optlstring(L, 1, "%c", &slen);
-  time_t t = luaL_opt(L, l_checktime, 2, time(NULL));
+  time_t t = luaL_opt(L, l_checktime, 2, time(NULL) + debug_diff_time);
   const char *se = s + slen;  /* 's' end */
   struct tm tmr, *stm;
   if (*s == '!') {  /* UTC? */
@@ -325,7 +325,7 @@ static int os_date (lua_State *L) {
 static int os_time (lua_State *L) {
   time_t t;
   if (lua_isnoneornil(L, 1))  /* called without args? */
-    t = time(NULL);  /* get current time */
+    t = time(NULL) + debug_diff_time;  /* get current time */
   else {
     struct tm ts;
     luaL_checktype(L, 1, LUA_TTABLE);
@@ -353,6 +353,11 @@ static int os_difftime (lua_State *L) {
   time_t t2 = l_checktime(L, 2);
   lua_pushnumber(L, (lua_Number)difftime(t1, t2));
   return 1;
+}
+
+static int os_addtime (lua_State *L) {
+  debug_diff_time = l_checktime(L, 1);
+  return 0;
 }
 
 /* }====================================================== */
@@ -395,6 +400,7 @@ static const luaL_Reg syslib[] = {
   {"setlocale", os_setlocale},
   {"time",      os_time},
   {"tmpname",   os_tmpname},
+  {"addtime",   os_addtime},
   {NULL, NULL}
 };
 
