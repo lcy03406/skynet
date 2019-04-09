@@ -293,7 +293,7 @@ skynet_now(void) {
 
 void
 skynet_addtime(uint32_t add) {
-	debug_diff_time = add;
+	debug_diff_time += add;
 }
 
 void 

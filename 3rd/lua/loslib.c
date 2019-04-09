@@ -356,7 +356,7 @@ static int os_difftime (lua_State *L) {
 }
 
 static int os_addtime (lua_State *L) {
-  debug_diff_time = l_checktime(L, 1);
+  debug_diff_time += l_checktime(L, 1);
   return 0;
 }
 
