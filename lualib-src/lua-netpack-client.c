@@ -23,6 +23,7 @@
 #define TYPE_CLOSE 5
 #define TYPE_WARNING 6
 #define TYPE_UDP 7
+#define TYPE_UC 8
 
 #ifdef CLIENT_USE_4_SIZE_BYTES
 #define SIZE_BYTES 4
@@ -183,16 +184,20 @@ push_data(lua_State *L, int fd, void *buffer, int size, int clone) {
 	}
 }
 
+static void
+push_uncomplete(struct queue *q, struct uncomplete *uc) {
+	int h = hash_fd(uc->pack.id, q->hashsize);
+	uc->next = q->hash[h];
+	q->hash[h] = uc;
+}
+
 static struct uncomplete *
 save_uncomplete(lua_State *L, int fd) {
 	struct queue *q = get_queue(L);
-	int h = hash_fd(fd, q->hashsize);
 	struct uncomplete * uc = skynet_malloc(sizeof(struct uncomplete));
 	memset(uc, 0, sizeof(*uc));
-	uc->next = q->hash[h];
 	uc->pack.id = fd;
-	q->hash[h] = uc;
-
+	push_uncomplete(q, uc);
 	return uc;
 }
 
@@ -200,7 +205,7 @@ static inline int
 read_size(uint8_t * buffer) {
 #ifdef CLIENT_USE_4_SIZE_BYTES
 	int r = (int)buffer[0] << 24 |(int)buffer[1] << 16 | (int)buffer[2] << 8  | (int)buffer[3];
-	if (r < 0 || r >= 0x500000) {
+	if (r < 0 || r >= 0x1000000) { //16M
 		return -1;
 	}
 #else
@@ -267,9 +272,9 @@ filter_data_(lua_State *L, int fd, uint8_t * buffer, int size) {
 			assert(uc->read == -1);
 			if(uc->header_read+size<SIZE_BYTES)
 			{
-				struct uncomplete * uc = save_uncomplete(L, fd);
 				memcpy(uc->header+uc->header_read, buffer, size);
 				uc->header_read += size;
+				push_uncomplete(q, uc);
 				return 1;
 			}
 			// read size
@@ -297,10 +302,12 @@ filter_data_(lua_State *L, int fd, uint8_t * buffer, int size) {
 		if (size < need) {
 			memcpy(uc->pack.buffer + uc->read, buffer, size);
 			uc->read += size;
-			int h = hash_fd(fd, q->hashsize);
-			uc->next = q->hash[h];
-			q->hash[h] = uc;
-			return 1;
+			push_uncomplete(q, uc);
+			lua_pushvalue(L, lua_upvalueindex(TYPE_UC));
+			lua_pushinteger(L, fd);
+			lua_pushinteger(L, uc->pack.size);
+			lua_pushinteger(L, uc->read);
+			return 5;
 		}
 		memcpy(uc->pack.buffer + uc->read, buffer, need);
 		buffer += need;
@@ -351,7 +358,11 @@ filter_data_(lua_State *L, int fd, uint8_t * buffer, int size) {
 			uc->pack.size = pack_size;
 			uc->pack.buffer = skynet_malloc(pack_size);
 			memcpy(uc->pack.buffer, buffer, size);
-			return 1;
+			lua_pushvalue(L, lua_upvalueindex(TYPE_UC));
+			lua_pushinteger(L, fd);
+			lua_pushinteger(L, pack_size);
+			lua_pushinteger(L, size);
+			return 5;
 		}
 		if (size == pack_size) {
 			// just one package
@@ -589,8 +600,9 @@ luaopen_skynet_netpack_client(lua_State *L) {
 	lua_pushliteral(L, "close");
 	lua_pushliteral(L, "warning");
 	lua_pushliteral(L, "udp");
+	lua_pushliteral(L, "uc");
 
-	lua_pushcclosure(L, lfilter, 7);
+	lua_pushcclosure(L, lfilter, 8);
 	lua_setfield(L, -2, "filter");
 
 	return 1;
