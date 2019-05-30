@@ -296,6 +296,17 @@ skynet_addtime(uint32_t add) {
 	debug_diff_time += add;
 }
 
+void
+skynet_resettime(void) {
+	uint32_t starttime = 0;
+	uint32_t current = 0;
+	systime(&starttime, &current);
+	if ((starttime - TI->starttime)*100 > TI->current) {
+		uint32_t diff = (starttime - TI->starttime)*100 - TI->current;
+		TI->current += diff;
+	}
+}
+
 void 
 skynet_timer_init(void) {
 	TI = timer_create_timer();

@@ -253,6 +253,7 @@ function skynet.localname(name)
 end
 
 skynet.addtime = c.addtime
+skynet.resettime = c.resettime
 skynet.now = c.now
 skynet.hpc = c.hpc	-- high performance counter
 
