@@ -3,7 +3,7 @@ local type = type
 
 local M = {}
 
-local LIMIT = 8192
+local LIMIT = 20*1024*1024
 
 local function chunksize(readbytes, body)
 	while true do
