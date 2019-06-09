@@ -420,6 +420,20 @@ static int sort (lua_State *L) {
   return 0;
 }
 
+static int isarray (lua_State *L) {
+  luaL_checktype(L, 1, LUA_TTABLE);
+  int is = lua_isarray(L, 1);
+  lua_pushboolean(L, is);
+  return 1;
+}
+
+static int sizearray (lua_State *L) {
+  luaL_checktype(L, 1, LUA_TTABLE);
+  size_t sz = lua_sizearray(L, 1);
+  lua_pushinteger(L, sz);
+  return 1;
+}
+
 /* }====================================================== */
 
 
@@ -434,6 +448,8 @@ static const luaL_Reg tab_funcs[] = {
   {"remove", tremove},
   {"move", tmove},
   {"sort", sort},
+  {"isarray", isarray},
+  {"sizearray", sizearray},
   {NULL, NULL}
 };
 

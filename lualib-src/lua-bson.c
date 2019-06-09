@@ -585,7 +585,7 @@ pack_meta_dict(lua_State *L, struct bson *b, int depth) {
 	write_byte(b,0);
 	write_length(b, b->size - length, length);
 }
-
+/*
 static bool
 is_rawarray(lua_State *L) {
 	size_t len = lua_rawlen(L, -1);
@@ -598,6 +598,11 @@ is_rawarray(lua_State *L) {
 		}
 	}
 	return false;
+}
+*/
+static bool
+is_rawarray(lua_State *L) {
+	return lua_isarray(L, -1);
 }
 
 static void

@@ -677,7 +677,7 @@ lua_Unsigned luaH_getn (Table *t) {
 
 
 
-#if defined(LUA_DEBUG)
+//#if defined(LUA_DEBUG)
 
 Node *luaH_mainposition (const Table *t, const TValue *key) {
   return mainposition(t, key);
@@ -685,4 +685,6 @@ Node *luaH_mainposition (const Table *t, const TValue *key) {
 
 int luaH_isdummy (const Table *t) { return isdummy(t); }
 
-#endif
+//#endif
+
+size_t luaH_sizearray (const Table *t) { return t->sizearray; }
