@@ -1205,6 +1205,21 @@ LUA_API int lua_next (lua_State *L, int idx) {
   return more;
 }
 
+LUA_API int lua_isarray (lua_State *L, int idx) {
+  StkId t;
+  lua_lock(L);
+  t = index2addr(L, idx);
+  api_check(L, ttistable(t), "table expected");
+  return luaH_isdummy(hvalue(t));
+}
+
+LUA_API size_t lua_sizearray (lua_State *L, int idx) {
+  StkId t;
+  lua_lock(L);
+  t = index2addr(L, idx);
+  api_check(L, ttistable(t), "table expected");
+  return luaH_sizearray(hvalue(t));
+}
 
 LUA_API void lua_concat (lua_State *L, int n) {
   lua_lock(L);

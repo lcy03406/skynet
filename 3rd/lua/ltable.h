@@ -57,10 +57,11 @@ LUAI_FUNC int luaH_next (lua_State *L, Table *t, StkId key);
 LUAI_FUNC lua_Unsigned luaH_getn (Table *t);
 
 
-#if defined(LUA_DEBUG)
+//#if defined(LUA_DEBUG)
 LUAI_FUNC Node *luaH_mainposition (const Table *t, const TValue *key);
 LUAI_FUNC int luaH_isdummy (const Table *t);
-#endif
+//#endif
+LUAI_FUNC size_t luaH_sizearray (const Table *t);
 
 
 #endif
